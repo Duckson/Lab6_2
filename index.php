@@ -3,63 +3,56 @@ session_start();
 
 class Forest
 {
+    public $animals;
+    public $plants;
 
-    function __construct()
-    {
-        $animal_types = ["Herbivore", "Carnivore"];
-        $plant_types = ["Grass", "Tree"];
 
-        if (!isset($_SESSION['animals']))
-            foreach ($animal_types as $type) {
-                for ($i = 0; $i < rand(2, 5); $i++) {
-                    $_SESSION['animals'][] = new $type;
-                }
+    function addAnimals($class, $min, $max){
+            for ($i = 0; $i < rand($min, $max); $i++) {
+                $this->animals[] = new $class;
             }
-
-        if (!isset($_SESSION['plants']))
-            foreach ($plant_types as $type) {
-                for ($i = 0; $i < rand(8, 15); $i++) {
-                    $_SESSION['plants'][] = new $type;
-                }
-            }
-
     }
 
-    public function reset()
-    {
-        unset($_SESSION['animals']);
-        unset($_SESSION['plants']);
-        header("location:index.php");
-        exit();
+    function addPlants($class, $min, $max){
+            for ($i = 0; $i < rand($min, $max); $i++) {
+                $this->plants[] = new $class;
+            }
     }
+
+
+    function eatAnimal($animal)
+    {
+        foreach ($this->animals as $key => $food) {
+                if ($animal->checkIfEdible($food)) {
+                    $animal->info['eaten_foods'][] = $food;
+                    unset($this->animals[$key]);
+                    return true;
+                }
+        } return false;
+    }
+
+    function eatPlant($animal)
+    {
+        foreach ($this->plants as $key => $food) {
+            if ($animal->checkIfEdible($food)) {
+                $animal->info['eaten_foods'][] = $food;
+                unset($this->plants[$key]);
+                return true;
+            }
+        } return false;
+    }
+
 }
 
 abstract class LivingThing
 {
-    protected $info;
-
-    public function getInfo()
-    {
-        return $this->info;
-    }
+    public $info;
 
 }
 
 abstract class Animal extends LivingThing
 {
-    function eat(&$foods)
-    {
-        $have_eaten = false;
 
-        foreach ($foods as $key=>$food) {
-            if ($have_eaten == false)
-                if ($this->checkIfEdible($food)) {
-                    $this->info['eaten_foods'][] = $food;
-                    unset($foods[$key]);
-                    $have_eaten = true;
-                }
-        }
-    }
 
     abstract function checkIfEdible($food);
 }
@@ -85,7 +78,7 @@ class Herbivore extends Animal
 
     function checkIfEdible($food)
     {
-        if ($food->getInfo()['type'] == $this->info['herb_foods'] || in_array($food->getInfo()['type'], $this->info['herb_foods']))
+        if ($food->info['type'] == $this->info['herb_foods'] || in_array($food->info['type'], $this->info['herb_foods']))
             return true;
         else return false;
     }
@@ -111,7 +104,7 @@ class Carnivore extends Animal
 
     function checkIfEdible($food)
     {
-        if ($food->getInfo()['size'] < $this->info['size'])
+        if (($food->info['size'] < $this->info['size']) && $food != $this)
             return true;
         else return false;
     }
@@ -166,14 +159,24 @@ class Tree extends LivingThing
     }
 }
 
-$forest = new Forest;
-if ($_POST['reset']) $forest->reset();
+if (!isset($_SESSION['forest'])) {
+    $_SESSION['forest'] = new Forest;
+    $_SESSION['forest']->addAnimals('Carnivore', 5, 10);
+    $_SESSION['forest']->addAnimals('Herbivore', 5, 10);
+    $_SESSION['forest']->addPlants('Grass', 10, 20);
+    $_SESSION['forest']->addPlants('Tree', 10, 20);
+}
 
-foreach ($_SESSION['animals'] as $id => $animal)
+if ($_POST['reset']) {
+    unset($_SESSION['forest']);
+    header("location:index.php");
+};
+
+foreach ($_SESSION['forest']->animals as $id => $animal)
     if (isset($_POST[$id]))
         if (get_class($animal) == "Carnivore")
-            $animal->eat($_SESSION['animals']);
-        else $animal->eat($_SESSION['plants']);
+            $_SESSION['forest']->eatAnimal($animal);
+        else $_SESSION['forest']->eatPlant($animal);
 require('header.php');
 ?>
 
@@ -189,16 +192,16 @@ require('header.php');
                     <th>Eaten foods</th>
                     <th>Eat</th>
                 </tr>
-                <? foreach ($_SESSION['animals'] as $id => $animal): ?>
+                <? foreach ($_SESSION['forest']->animals as $id => $animal): ?>
                     <tr>
-                        <td><?= $animal->getInfo()['type'] ?></td>
-                        <td><?= $animal->getInfo()['size'] ?></td>
+                        <td><?= $animal->info['type'] ?></td>
+                        <td><?= $animal->info['size'] ?></td>
                         <td><?= get_class($animal) ?></td>
                         <td>
-                            <?php if (isset($animal->getInfo()['eaten_foods'])): ?>
+                            <?php if (isset($animal->info['eaten_foods'])): ?>
 
-                                <? foreach ($animal->getInfo()['eaten_foods'] as $food): ?>
-                                    <?= $food->getInfo()['type'] . " of size " . $food->getInfo()['size'] . "<br>" ?>
+                                <? foreach ($animal->info['eaten_foods'] as $food): ?>
+                                    <?= $food->info['type'] . " of size " . $food->info['size'] . "<br>" ?>
                                 <? endforeach; ?>
 
                             <?php endif; ?>
@@ -220,10 +223,10 @@ require('header.php');
                     <th>Size</th>
                     <th>Type</th>
                 </tr>
-                <? foreach ($_SESSION['plants'] as $plant): ?>
+                <? foreach ($_SESSION['forest']->plants as $plant): ?>
                     <tr>
-                        <td><?= $plant->getInfo()['type'] ?></td>
-                        <td><?= $plant->getInfo()['size'] ?></td>
+                        <td><?= $plant->info['type'] ?></td>
+                        <td><?= $plant->info['size'] ?></td>
                         <td><?= get_class($plant) ?></td>
                     </tr>
                 <? endforeach; ?>
