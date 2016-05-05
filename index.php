@@ -14,7 +14,7 @@ class Forest
             $this->animals[] = new $class(1 * $mult, 2 * $mult);
         }
     }
-    
+
     function addGarbage($class, $min = 5, $max = 10, $mult = 10)
     {
         for ($i = 0; $i < rand($min, $max); $i++) {
@@ -30,10 +30,10 @@ class Forest
     }
 
 
-    function eatAnimal($animal)
+    function feedWithAnimal($animal, $mood = 0)
     {
         foreach ($this->animals as $key => $food) {
-            if ($animal->checkIfEdible($food)) {
+            if ($animal->checkIfEdible($food, $mood)) {
                 $animal->eaten_foods[] = $food;
                 unset($this->animals[$key]);
                 return $animal->sound;
@@ -44,26 +44,33 @@ class Forest
 
     function eatAnything($animal)
     {
-        $types = ['animals', 'plants', 'garbage'];
+        $types = ['Animal', 'Plant', 'Garbage'];
+        shuffle($types);
 
-        foreach ($types as $t_key => $type) {
-            $mood = array_rand($types);
-            foreach ($this->{$types[$mood]} as $key => $food) {
-                if ($animal->checkIfEdible($food, $types[$mood])) {
-                    $animal->eaten_foods[] = $food;
-                    unset($this->{$types[$mood]}[$key]);
-                    return $animal->sound;
-                }
+        foreach ($types as $key => $type) {
+            switch ($types[$key]) {
+                case 'Animal':
+                    $result = $this->feedWithAnimal($animal, $types[$key]);
+                    if ($result != "Нет еды") return $result;
+                    break;
+                case 'Plant':
+                    $result = $this->feedWithPlant($animal, $types[$key]);
+                    if ($result != "Нет еды") return $result;
+                    break;
+                case "Garbage":
+                    $result = $this->feedWithGarbage($animal, $types[$key]);
+                    if ($result != "Нет еды") return $result;
+                    break;
             }
-            unset($types[$mood]);
+            unset($types[$key]);
         }
         return "Нет еды";
     }
 
-    function eatPlant($animal)
+    function feedWithPlant($animal, $mood = 0)
     {
         foreach ($this->plants as $key => $food) {
-            if ($animal->checkIfEdible($food)) {
+            if ($animal->checkIfEdible($food, $mood)) {
                 $animal->eaten_foods[] = $food;
                 unset($this->plants[$key]);
                 return $animal->sound;
@@ -71,6 +78,19 @@ class Forest
         }
         return "Нет еды";
     }
+
+    function feedWithGarbage($animal, $mood = 0)
+    {
+        foreach ($this->garbage as $key => $food) {
+            if ($animal->checkIfEdible($food, $mood)) {
+                $animal->eaten_foods[] = $food;
+                unset($this->garbage[$key]);
+                return $animal->sound;
+            }
+        }
+        return "Нет еды";
+    }
+
 
 }
 
@@ -84,13 +104,15 @@ abstract class Animal extends LivingThing
 {
     public $eaten_foods;
     public $sound;
+
+    abstract function checkIfEdible($food, $mood);
 }
 
 abstract class Herbivore extends Animal
 {
     public $herb_foods;
 
-    function checkIfEdible($food)
+    function checkIfEdible($food, $mood)
     {
         if (get_class($food) == $this->herb_foods || in_array(get_class($food), $this->herb_foods))
             return true;
@@ -122,7 +144,7 @@ class Goat extends Herbivore
 
 abstract class Carnivore extends Animal
 {
-    function checkIfEdible($food)
+    function checkIfEdible($food, $mood)
     {
         if (($food->size < $this->size) && $food != $this)
             return true;
@@ -155,15 +177,15 @@ abstract class Omnivore extends Animal
     function checkIfEdible($food, $mood)
     {
         switch ($mood) {
-            case 'animals':
+            case 'Animal':
                 if (($food->size < $this->size) && $food != $this)
                     return true;
                 else return false;
-            case 'plants':
+            case 'Plant':
                 if (get_class($food) == $this->herb_foods || in_array(get_class($food), $this->herb_foods))
                     return true;
                 else return false;
-            case 'garbage':
+            case 'Garbage':
                 return true;
             default:
                 return false;
@@ -191,18 +213,21 @@ class Bear extends Omnivore
     }
 }
 
-abstract class Garbage{
+abstract class Garbage
+{
     public $size;
 }
 
-class LeafPile extends Garbage{
+class LeafPile extends Garbage
+{
     function __construct($min, $max)
     {
         $this->size = rand($min, $max);
     }
 }
 
-class Poo extends Garbage{
+class Poo extends Garbage
+{
     function __construct($min, $max)
     {
         $this->size = rand($min, $max);
@@ -375,10 +400,10 @@ require('header.php');
                     <th>Name</th>
                     <th>Size</th>
                 </tr>
-                <? foreach ($_SESSION['forest']->plants as $plant): ?>
+                <? foreach ($_SESSION['forest']->garbage as $garbage): ?>
                     <tr>
-                        <td><?= get_class($plant) ?></td>
-                        <td><?= $plant->size ?></td>
+                        <td><?= get_class($garbage) ?></td>
+                        <td><?= $garbage->size ?></td>
                     </tr>
                 <? endforeach; ?>
             </table>
