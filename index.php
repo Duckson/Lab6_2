@@ -29,8 +29,13 @@ class Forest
         }
     }
 
+    function feed(Animal $animal)
+    {
+        return $animal->eat($this);
+    }
 
-    function feedWithAnimal($animal, $mood = 0)
+
+    /*function feedWithAnimal($animal, $mood = 0)
     {
         foreach ($this->animals as $key => $food) {
             if ($animal->checkIfEdible($food, $mood)) {
@@ -89,7 +94,7 @@ class Forest
             }
         }
         return "Нет еды";
-    }
+    }*/
 
 
 }
@@ -106,13 +111,56 @@ abstract class Animal extends LivingThing
     public $sound;
 
     abstract function checkIfEdible($food, $mood);
+
+    abstract function eat($forest);
+
+    function eatPlant(Forest $forest, $mood = 0)
+    {
+        foreach ($forest->plants as $key => $food) {
+            if ($this->checkIfEdible($food, $mood)) {
+                $this->eaten_foods[] = $food;
+                unset($forest->plants[$key]);
+                return $this->sound;
+            }
+        }
+        return "Нет еды";
+    }
+
+    function eatAnimal(Forest $forest, $mood = 0)
+    {
+        foreach ($forest->animals as $key => $food) {
+            if ($this->checkIfEdible($food, $mood)) {
+                $this->eaten_foods[] = $food;
+                unset($forest->animals[$key]);
+                return $this->sound;
+            }
+        }
+        return "Нет еды";
+    }
+
+    function eatGarbage(Forest $forest, $mood = 0)
+    {
+        foreach ($forest->garbage as $key => $food) {
+            if ($this->checkIfEdible($food, $mood)) {
+                $this->eaten_foods[] = $food;
+                unset($forest->garbage[$key]);
+                return $this->sound;
+            }
+        }
+        return "Нет еды";
+    }
 }
 
 abstract class Herbivore extends Animal
 {
     public $herb_foods;
 
-    function checkIfEdible($food, $mood)
+    function eat($forest)
+    {
+        return $this->eatPlant($forest);
+    }
+
+    function checkIfEdible($food, $mood = 0)
     {
         if (get_class($food) == $this->herb_foods || in_array(get_class($food), $this->herb_foods))
             return true;
@@ -144,6 +192,11 @@ class Goat extends Herbivore
 
 abstract class Carnivore extends Animal
 {
+    function eat($forest)
+    {
+        return $this->eatAnimal($forest);
+    }
+
     function checkIfEdible($food, $mood)
     {
         if (($food->size < $this->size) && $food != $this)
@@ -173,6 +226,42 @@ class Fox extends Carnivore
 abstract class Omnivore extends Animal
 {
     public $herb_foods;
+
+    function eat($forest)
+    {
+        $types = get_object_vars($forest);
+        shuffle($types);
+
+        foreach ($types as $key => $type) {
+            if ($this->isArrOfObjs($type)) {    //чтоб не жрал ненужные переменные леса
+                $mood = get_parent_class(get_parent_class(array_values($type)[0]));
+                switch ($mood) {
+                    case 'Animal':
+                        $result = $this->eatAnimal($forest, $mood);
+                        if ($result != "Нет еды") return $result;
+                        break;
+                    case 'Plant':
+                        $result = $this->eatPlant($forest, $mood);
+                        if ($result != "Нет еды") return $result;
+                        break;
+                    case "Garbage":
+                        $result = $this->eatGarbage($forest, $mood);
+                        if ($result != "Нет еды") return $result;
+                        break;
+                }
+            }
+        }
+        return "Нет еды";
+    }
+
+    function isArrOfObjs($arr)
+    {
+        if (!is_array($arr)) return false;
+        foreach ($arr as $obj) {
+            if (!is_object($obj)) return false;
+        }
+        return true;
+    }
 
     function checkIfEdible($food, $mood)
     {
@@ -218,7 +307,7 @@ abstract class Garbage
     public $size;
 }
 
-class LeafPile extends Garbage
+abstract class WasteOfLiving extends Garbage
 {
     function __construct($min, $max)
     {
@@ -226,15 +315,19 @@ class LeafPile extends Garbage
     }
 }
 
-class Poo extends Garbage
+class LeafPile extends WasteOfLiving
 {
-    function __construct($min, $max)
-    {
-        $this->size = rand($min, $max);
-    }
 }
 
-abstract class Grass extends LivingThing
+class Poo extends WasteOfLiving
+{
+}
+
+abstract class Plant extends LivingThing
+{
+}
+
+abstract class Grass extends Plant
 {
 }
 
@@ -263,7 +356,7 @@ class Wheat extends Grass
 }
 
 
-class Tree extends LivingThing
+class Tree extends Plant
 {
 }
 
@@ -307,19 +400,8 @@ if ($_POST['reset']) {
 
 foreach ($_SESSION['forest']->animals as $id => $animal)
     if (isset($_POST[$id]))
-        switch (get_parent_class($animal)) {
-            case "Carnivore":
-                $_SESSION['sound'] = $_SESSION['forest']->eatAnimal($animal);
-                break;
-            case "Omnivore":
-                $_SESSION['sound'] = $_SESSION['forest']->eatAnything($animal);
-                break;
-            case "Herbivore":
-                $_SESSION['sound'] = $_SESSION['forest']->eatPlant($animal);
-                break;
-            default:
-                echo "wut!!?!?!!!?!?!?!";
-        }
+        $_SESSION['sound'] = $_SESSION['forest']->feed($animal);
+
 
 require('header.php');
 ?>
